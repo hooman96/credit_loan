@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # ### Import 
@@ -129,13 +128,13 @@ classifier.fit(train_x, train_y)
 
 class_predict = classifier.predict(test_x)
 accuracy = classifier.score(test_x, test_y)
-print 'Classification Accuracy: ' + str(accuracy)
+print('Classification Accuracy: ' + str(accuracy))
 zeros_predicted = sum([x == y for (x, y) in zip(test_y, class_predict) if x == 0])
 ones_predicted = sum([x == y for (x, y) in zip(test_y, class_predict) if x == 1])
 total_zeros = sum([x == 0 for x in test_y])
 total_ones = sum([x == 1 for x in test_y])
-print 'Zero Accuracy: ' + str(float(zeros_predicted) / total_zeros)
-print 'One Accuracy: ' + str(float(ones_predicted) / total_ones)
+print('Zero Accuracy: ' + str(float(zeros_predicted) / total_zeros))
+print('One Accuracy: ' + str(float(ones_predicted) / total_ones))
 
 
 # ### Train regression on points with loss
@@ -183,46 +182,10 @@ regression.fit(train_x, train_y)
 
 loss_predict = regression.predict(test_x)
 accuracy = regression.score(test_x, test_y)
-print 'Regression Accuracy: ' + str(accuracy)
+print('Regression Accuracy: ' + str(accuracy))
 
 
 # In[16]:
 
 
-result = loss_predict * class_predict
-print 'Training MAE: ' + str(sk.metrics.mean_absolute_error(dev_test.iloc[:, -1], result))
-
-
-# ## Try with kaggle test data
-
-# In[17]:
-
-
-kaggle = pd.read_csv('test_final.csv')
-
-
-# In[18]:
-
-
-# Remove extra column
-kaggle = kaggle.iloc[:, 1:]
-
-
-# In[19]:
-
-
-# Make classification
-test_x = make_class_x(kaggle)
-class_predict = classifier.predict(test_x)
-
-# Make regression
-test_x = make_regression_x(kaggle)
-loss_predict = regression.predict(test_x)
-result = class_predict*loss_predict
-
-# Get final output
-kaggle['loss'] = result
-final_result = kaggle.ix[:, ['id', 'loss']]
-final_result.to_csv('final_results.csv', sep=',', header=True, index=False)
-final_result
-
+result =
