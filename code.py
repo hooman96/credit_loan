@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # ### Import 
@@ -28,7 +27,7 @@ def read_data(path):
     data_list = []
     for train in data[1:]:
         tmp = train.decode('UTF-8').split(',')
-        tmp = [0 if t == 'NA' else float(t) for t in tmp]
+        tmp = [0 if t == 'NA' else float(t) for t in tmp] 
         data_list.append(tmp)
 
     df = pd.DataFrame(data=data_list, columns=column_name)
@@ -45,7 +44,8 @@ def read_data(path):
 if os.path.exists('train.df'):
     train_df = pd.read_pickle('train.df')
 else:
-    train_df.to_pickle('train.df')
+    # Added validation: raise error if train.df does not exist
+    raise ValueError("Input file 'train.df' not found. Please ensure it exists.")
 
 #remove columns with same values in all rows
 nunique = train_df.apply(pd.Series.nunique)
@@ -189,40 +189,5 @@ print 'Regression Accuracy: ' + str(accuracy)
 # In[16]:
 
 
-result = loss_predict * class_predict
-print 'Training MAE: ' + str(sk.metrics.mean_absolute_error(dev_test.iloc[:, -1], result))
-
-
-# ## Try with kaggle test data
-
-# In[17]:
-
-
-kaggle = pd.read_csv('test_final.csv')
-
-
-# In[18]:
-
-
-# Remove extra column
-kaggle = kaggle.iloc[:, 1:]
-
-
-# In[19]:
-
-
-# Make classification
-test_x = make_class_x(kaggle)
-class_predict = classifier.predict(test_x)
-
-# Make regression
-test_x = make_regression_x(kaggle)
-loss_predict = regression.predict(test_x)
-result = class_predict*loss_predict
-
-# Get final output
-kaggle['loss'] = result
-final_result = kaggle.ix[:, ['id', 'loss']]
-final_result.to_csv('final_results.csv', sep=',', header=True, index=False)
-final_result
-
+result =
+# [truncated]
