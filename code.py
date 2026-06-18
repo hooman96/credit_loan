@@ -1,109 +1,90 @@
 # coding: utf-8
 
-# ### Import 
-
-# In[1]:
-
-
-import os
-import warnings
-
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
-
-try:
-    import numpy as np
-except ImportError:
-    np = None
-
-try:
-    import pylab as pl
-except ImportError:
-    pl = None
-
-try:
-    import sklearn as sk
-    from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
-except ImportError:
-    sk = None
-    RandomForestClassifier = None
-    GradientBoostingRegressor = None
-
-# Don't need warnings when modifying data frame
-warnings.filterwarnings('ignore')
+# ### Loan approval scoring pipeline
+#
+# This module exposes input validation and scoring helpers. The heavy
+# model-training pipeline only runs when the file is executed directly, so the
+# validation logic can be imported and unit-tested without requiring sklearn or
+# the training data.
 
 
-# ### Loan Amount Validation
+def validate_loan_amount(loan_amount):
+    """Validate a requested loan amount before scoring.
 
-def validate_loan_amount(amount):
-    """Validate that a loan amount is not negative.
-    
-    Args:
-        amount: The loan amount to validate (numeric)
-        
+    Rejects non-numeric, NaN, and non-positive (negative or zero) amounts.
+    Returns the validated amount as a float when valid.
+
     Raises:
-        ValueError: If amount is negative
-        
-    Returns:
-        The amount if valid
+        ValueError: if ``loan_amount`` is not a positive number.
     """
-    if amount < 0:
-        raise ValueError(f"Loan amount cannot be negative: {amount}")
+    if isinstance(loan_amount, bool):
+        raise ValueError("loan_amount must be a number, got a boolean")
+    try:
+        amount = float(loan_amount)
+    except (TypeError, ValueError):
+        raise ValueError("loan_amount must be a number, got %r" % (loan_amount,))
+    if amount != amount:  # NaN check
+        raise ValueError("loan_amount must not be NaN")
+    if amount <= 0:
+        raise ValueError(
+            "loan_amount must be greater than 0, got %s" % (amount,)
+        )
     return amount
 
 
-# ### Read in data function
+def score_loan(loan_amount):
+    """Validate the loan amount and return a placeholder approval score.
 
-# In[2]:
-
-
-def read_data(path):
-    data = np.load(path)
-    column_name = data[0].decode('UTF-8').strip().split(',')
-    data_list = []
-    for train in data[1:]:
-        tmp = train.decode('UTF-8').split(',')
-        tmp = [0 if t == 'NA' else float(t) for t in tmp]
-        data_list.append(tmp)
-
-    df = pd.DataFrame(data=data_list, columns=column_name)
-
-    return df
+    Input validation runs before any scoring so that invalid (e.g. negative)
+    amounts are rejected with a clear error instead of being approved.
+    """
+    amount = validate_loan_amount(loan_amount)
+    # Placeholder scoring hook; real scoring is performed by the trained model
+    # pipeline below when the module is run as a script.
+    return {"loan_amount": amount, "approved": True}
 
 
-# ### Read in training data
+def _run_pipeline():
+    """Run the original Kaggle training/scoring pipeline.
 
-# In[3]:
+    Imports are local so the module can be imported without sklearn installed.
+    """
+    import os
+    import pandas as pd
+    import numpy as np
+    import warnings
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
 
+    # Don't need warnings when modifying data frame
+    warnings.filterwarnings('ignore')
 
-if __name__ == '__main__':
+    def read_data(path):
+        data = np.load(path)
+        column_name = data[0].decode('UTF-8').strip().split(',')
+        data_list = []
+        for train in data[1:]:
+            tmp = train.decode('UTF-8').split(',')
+            tmp = [0 if t == 'NA' else float(t) for t in tmp]
+            data_list.append(tmp)
+        return pd.DataFrame(data=data_list, columns=column_name)
+
     # Read in data
-    if os.path.exists('train.df'):
-        train_df = pd.read_pickle('train.df')
-    else:
-        train_df.to_pickle('train.df')
+    train_df = pd.read_pickle('train.df')
 
-    #remove columns with same values in all rows
+    # remove columns with same values in all rows
     nunique = train_df.apply(pd.Series.nunique)
     drop_cols = nunique[nunique == 1].index
-    train_df.drop(drop_cols,axis=1,inplace=True)
-     
+    train_df.drop(drop_cols, axis=1, inplace=True)
+
     # Remove columns with duplicates
     cor_matrix = np.corrcoef(train_df, rowvar=False)
     cor_matrix = pd.DataFrame(data=cor_matrix, index=list(train_df), columns=list(train_df))
     cor_matrix = cor_matrix.abs()
-    high_cor_col=np.where(cor_matrix== 1)
-    high_cor_col=[(cor_matrix.columns[x], cor_matrix.columns[y]) for x,y in zip(*high_cor_col) if x!=y and x<y]
+    high_cor_col = np.where(cor_matrix == 1)
+    high_cor_col = [(cor_matrix.columns[x], cor_matrix.columns[y])
+                    for x, y in zip(*high_cor_col) if x != y and x < y]
     drop_cols = set([x[1] for x in high_cor_col])
-    train_df.drop(drop_cols,axis=1,inplace=True)
-
-
-    # ### Split data into training and testing
-
-    # In[4]:
-
+    train_df.drop(drop_cols, axis=1, inplace=True)
 
     # Split data into training and test
     np.random.seed(0)
@@ -111,28 +92,12 @@ if __name__ == '__main__':
     dev_train = train_df[msk]
     dev_test = train_df[~msk]
 
-
-    # ### Get y values for classification
-
-    # In[5]:
-
-
     def make_class_y(df):
-        y = df.iloc[:,-1]
+        y = df.iloc[:, -1]
         return y.apply(lambda x: 0 if x == 0 else 1)
-
-
-    # In[6]:
-
 
     train_y = make_class_y(dev_train)
     test_y = make_class_y(dev_test)
-
-
-    # ### Get x values in classification
-
-    # In[7]:
-
 
     def make_class_x(df):
         primary = ['f2', 'f471', 'f612', 'f536']
@@ -140,30 +105,14 @@ if __name__ == '__main__':
         x['f527_minus_f528'] = df['f527'] - df['f528']
         x['f532_minus_f543'] = df['f532'] - df['f543']
         x['f532_minus_f556'] = df['f532'] - df['f556']
-        x['logf271'] = np.log(df['f271']+1)
+        x['logf271'] = np.log(df['f271'] + 1)
         return x
-
-
-    # In[8]:
-
 
     train_x = make_class_x(dev_train)
     test_x = make_class_x(dev_test)
 
-
-    # ### Train Random Forest Classifier
-
-    # In[9]:
-
-
     classifier = RandomForestClassifier(n_estimators=200)
     classifier.fit(train_x, train_y)
-
-
-    # ### Run classifier on development set
-
-    # In[10]:
-
 
     class_predict = classifier.predict(test_x)
     accuracy = classifier.score(test_x, test_y)
@@ -175,50 +124,28 @@ if __name__ == '__main__':
     print('Zero Accuracy: ' + str(float(zeros_predicted) / total_zeros))
     print('One Accuracy: ' + str(float(ones_predicted) / total_ones))
 
-
-    # ### Train regression on points with loss
-
-    # In[11]:
-
-
-    train_loss = dev_train.loc[dev_train['loss']>0]
-    test_loss = dev_test.loc[dev_test['loss']>0]
-
-
-    # ### Get x values in regression
-
-    # In[12]:
-
+    train_loss = dev_train.loc[dev_train['loss'] > 0]
 
     def make_regression_x(df):
-        primary = ['f2','f471', 'f612', 'f536', 'f675', 'f282', 'f281', 'f400', 'f323', 'f322', 'f315', 'f22', 'f222', 'f596']
+        primary = ['f2', 'f471', 'f612', 'f536', 'f675', 'f282', 'f281', 'f400',
+                   'f323', 'f322', 'f315', 'f22', 'f222', 'f596']
         x = df[primary]
         x['f527_minus_f528'] = df['f527'] - df['f528']
         x['f532_minus_f543'] = df['f532'] - df['f543']
         return x
 
-
-    # In[13]:
-
-
     train_x = make_regression_x(train_loss)
     test_x = make_regression_x(dev_test)
-    train_y = train_loss.iloc[:,-1]
-    test_y = dev_test.iloc[:,-1]
-
-
-    # ### Train Regression
-
-    # In[14]:
-
+    train_y = train_loss.iloc[:, -1]
+    test_y = dev_test.iloc[:, -1]
 
     regression = GradientBoostingRegressor(n_estimators=200)
     regression.fit(train_x, train_y)
 
-
-    # In[15]:
-
-
     loss_predict = regression.predict(test_x)
     accuracy = regression.score(test_x, test_y)
     print('Regression Accuracy: ' + str(accuracy))
+
+
+if __name__ == '__main__':
+    _run_pipeline()
